@@ -18,6 +18,9 @@ if [[ "$admin_email" ]]; then
   EMAIL="$admin_email"
 fi
 
+MM_USER="${MM_USER:-media}"
+MM_GROUP="${MM_GROUP:-media}"
+
 setup_yq
 NODE_VERSION="24" setup_nodejs
 setup_uv
@@ -48,16 +51,19 @@ export FRONTEND_FILES_DIR="${MM_DIR}/web/build"
 export PUBLIC_VERSION=""
 export PUBLIC_API_URL=""
 export BASE_PATH="/web"
+mkdir -p "$MM_DIR"
+chown -R $MM_USER:$MM_GROUP "$MM_DIR"
 cd /opt/mediamanager/web
-$STD npm ci --no-fund --no-audit
-$STD npm run build
+sudo -u $MM_USER npm ci --no-fund --no-audit
+sudo -u $MM_USER npm run build
 mkdir -p {"$MM_DIR"/web,"$MEDIA_DIR","$CONFIG_DIR"}
 cp -r build "$FRONTEND_FILES_DIR"
 export BASE_PATH=""
 export VIRTUAL_ENV="${MM_DIR}/venv"
 cd /opt/mediamanager
+chown -R $MM_USER:$MM_GROUP /opt/mediamanager
 cp -r {media_manager,alembic*} "$MM_DIR"
-$STD /usr/local/bin/uv sync --locked --active -n -p cpython3.13 --managed-python
+sudo -u $MM_USER /usr/local/bin/uv sync --locked --active -n -p cpython3.13 --managed-python
 msg_ok "Configured MediaManager"
 
 msg_info "Creating config and start script"
@@ -75,6 +81,7 @@ sed -e "s/localhost:8/$LOCAL_IP:8/g" \
   /opt/mediamanager/config.example.toml >"$CONFIG_DIR"/config.toml
 
 mkdir -p "$MEDIA_DIR"/{images,tv,movies,torrents}
+chown -R $MM_USER:$MM_GROUP "$MEDIA_DIR" "$CONFIG_DIR" "$FRONTEND_FILES_DIR" "$MM_DIR"
 
 cat <<EOF >"$MM_DIR"/start.sh
 #!/usr/bin/env bash
@@ -83,8 +90,10 @@ export CONFIG_DIR="$CONFIG_DIR"
 export FRONTEND_FILES_DIR="$FRONTEND_FILES_DIR"
 export LOG_FILE="$CONFIG_DIR/media_manager.log"
 export BASE_PATH=""
+
 cd $MM_DIR
 source ./venv/bin/activate
+
 /usr/local/bin/uv run alembic upgrade head
 /usr/local/bin/uv run fastapi run ./media_manager/main.py --port 8000
 EOF
@@ -98,6 +107,8 @@ Description=MediaManager Backend Service
 After=network.target
 
 [Service]
+User=media
+Group=media
 Type=simple
 WorkingDirectory=${MM_DIR}
 ExecStart=/usr/bin/bash start.sh

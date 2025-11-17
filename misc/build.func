@@ -1343,7 +1343,17 @@ EOF'
   fi
   msg_ok "Customized LXC Container"
 
-  lxc-attach -n "$CTID" -- bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/install/${var_install}.sh)"
+  # Create media user/group before installer runs
+  lxc-attach -n "$CTID" -- bash -c "
+    if ! getent group ${MM_GROUP:-media} >/dev/null; then
+      groupadd ${MM_GROUP:-media}
+    fi
+    if ! id ${MM_USER:-media} >/dev/null 2>&1; then
+      useradd -r -s /usr/sbin/nologin -g ${MM_GROUP:-media} ${MM_USER:-media}
+    fi
+  "
+
+  lxc-attach -n "$CTID" -- bash -c "$(curl -fsSL https://raw.githubusercontent.com/salarx/ProxmoxVE/main/install/${var_install}.sh)"
 }
 
 # This function sets the description of the container.
