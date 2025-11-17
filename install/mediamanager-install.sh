@@ -72,7 +72,8 @@ export BASE_PATH=""
 export VIRTUAL_ENV="${MM_DIR}/venv"
 cd /opt/mediamanager
 cp -r {media_manager,alembic*} "$MM_DIR"
-sudo -u $MM_USER /usr/local/bin/uv sync --locked --active -n -p cpython3.13 --managed-python
+/usr/local/bin/uv sync --locked --active -n -p cpython3.13 --managed-python
+chown -R $MM_USER:$MM_GROUP "$MM_DIR"
 msg_ok "Configured MediaManager"
 
 msg_info "Creating config and start script"
