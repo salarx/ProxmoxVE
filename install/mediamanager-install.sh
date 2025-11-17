@@ -48,37 +48,55 @@ MM_DIR="/opt/mm"
 MEDIA_DIR="${MM_DIR}/media"
 export CONFIG_DIR="${MM_DIR}/config"
 export FRONTEND_FILES_DIR="${MM_DIR}/web/build"
-export PUBLIC_VERSION=""
-export PUBLIC_API_URL=""
-export BASE_PATH="/web"
+
+# create mm dir and make sure ownership is correct
 mkdir -p "$MM_DIR"
-chown -R $MM_USER:$MM_GROUP /opt/mediamanager
-chown -R $MM_USER:$MM_GROUP "$MM_DIR"
+chown -R $MM_USER:$MM_GROUP /opt/mediamanager "$MM_DIR"
+
+# go to source web directory
 cd /opt/mediamanager/web
 
-cat <<EOF > /opt/mediamanager/web/.env
+# create Svelte/Vite .env so PUBLIC_* are available during build
+cat <<EOF >/opt/mediamanager/web/.env
 PUBLIC_VERSION=""
 PUBLIC_API_URL=""
 BASE_PATH="/web"
 EOF
-
 chown $MM_USER:$MM_GROUP /opt/mediamanager/web/.env
 
+# ensure web source is owned by media before npm
+chown -R $MM_USER:$MM_GROUP /opt/mediamanager/web
+
+# run frontend build as media
 sudo -u $MM_USER npm ci --no-fund --no-audit
 sudo -u $MM_USER npm run build
+
+# copy build into mm output
 mkdir -p {"$MM_DIR"/web,"$MEDIA_DIR","$CONFIG_DIR"}
 cp -r build "$FRONTEND_FILES_DIR"
-export BASE_PATH=""
+
+# prepare uv home inside /opt/mm so python installs are media-owned
+export UV_HOME="${MM_DIR}/.py"
+mkdir -p "$UV_HOME"
+chown -R $MM_USER:$MM_GROUP "$UV_HOME"
+
+# explicitly set virtual env path variable (keeps behavior explicit)
 export VIRTUAL_ENV="${MM_DIR}/venv"
+
 cd /opt/mediamanager
 cp -r {media_manager,alembic*} "$MM_DIR"
-/usr/local/bin/uv sync --locked --active -n -p cpython3.13 --managed-python
+
+# Run uv sync as media, but using media-owned UV_HOME so python is installed under /opt/mm/.py
+sudo -u $MM_USER UV_HOME="$UV_HOME" /usr/local/bin/uv sync --locked --active -n -p cpython3.13 --managed-python
+
+# Fix permissions after syncing python & venv
 chown -R $MM_USER:$MM_GROUP "$MM_DIR"
 msg_ok "Configured MediaManager"
 
 msg_info "Creating config and start script"
 LOCAL_IP="$(hostname -I | awk '{print $1}')"
 SECRET="$(openssl rand -hex 32)"
+
 sed -e "s/localhost:8/$LOCAL_IP:8/g" \
   -e "s|/data/|$MEDIA_DIR/|g" \
   -e 's/"db"/"localhost"/' \
@@ -93,21 +111,32 @@ sed -e "s/localhost:8/$LOCAL_IP:8/g" \
 mkdir -p "$MEDIA_DIR"/{images,tv,movies,torrents}
 chown -R $MM_USER:$MM_GROUP "$MEDIA_DIR" "$CONFIG_DIR" "$FRONTEND_FILES_DIR" "$MM_DIR"
 
-cat <<EOF >"$MM_DIR"/start.sh
+# create start script (explicit VIRTUAL_ENV + UV_HOME + explicit uv path)
+cat <<'EOF' >"$MM_DIR"/start.sh
 #!/usr/bin/env bash
 
-export CONFIG_DIR="$CONFIG_DIR"
-export FRONTEND_FILES_DIR="$FRONTEND_FILES_DIR"
+export CONFIG_DIR="__CONFIG_DIR__"
+export FRONTEND_FILES_DIR="__FRONTEND_FILES_DIR__"
 export LOG_FILE="$CONFIG_DIR/media_manager.log"
 export BASE_PATH=""
+export VIRTUAL_ENV="__VIRTUAL_ENV__"
+export UV_HOME="__UV_HOME__"
 
-cd $MM_DIR
+cd /opt/mm
 source ./venv/bin/activate
 
 /usr/local/bin/uv run alembic upgrade head
 /usr/local/bin/uv run fastapi run ./media_manager/main.py --port 8000
 EOF
+
+# fill placeholders with real values (use simple sed to avoid variable interpolation at here-doc)
+sed -i "s|__CONFIG_DIR__|$CONFIG_DIR|g" "$MM_DIR"/start.sh
+sed -i "s|__FRONTEND_FILES_DIR__|$FRONTEND_FILES_DIR|g" "$MM_DIR"/start.sh
+sed -i "s|__VIRTUAL_ENV__|$VIRTUAL_ENV|g" "$MM_DIR"/start.sh
+sed -i "s|__UV_HOME__|$UV_HOME|g" "$MM_DIR"/start.sh
+
 chmod +x "$MM_DIR"/start.sh
+chown $MM_USER:$MM_GROUP "$MM_DIR"/start.sh
 msg_ok "Created config and start script"
 
 msg_info "Creating service"
@@ -117,15 +146,17 @@ Description=MediaManager Backend Service
 After=network.target
 
 [Service]
-User=media
-Group=media
+User=$MM_USER
+Group=$MM_GROUP
 Type=simple
 WorkingDirectory=${MM_DIR}
 ExecStart=/usr/bin/bash start.sh
+Restart=always
 
 [Install]
 WantedBy=multi-user.target
 EOF
+
 systemctl enable -q --now mediamanager
 msg_ok "Created service"
 
