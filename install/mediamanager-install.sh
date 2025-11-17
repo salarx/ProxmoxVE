@@ -52,6 +52,7 @@ export PUBLIC_VERSION=""
 export PUBLIC_API_URL=""
 export BASE_PATH="/web"
 mkdir -p "$MM_DIR"
+chown -R $MM_USER:$MM_GROUP /opt/mediamanager
 chown -R $MM_USER:$MM_GROUP "$MM_DIR"
 cd /opt/mediamanager/web
 sudo -u $MM_USER npm ci --no-fund --no-audit
