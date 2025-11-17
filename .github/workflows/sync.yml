@@ -1,0 +1,29 @@
+name: Sync Fork
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"   # Every 6 hours
+  workflow_dispatch:        # Allow manual sync
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout target repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add upstream remote
+        run: |
+          git remote add upstream https://github.com/community-scripts/ProxmoxVE.git
+          git fetch upstream
+          git checkout main
+
+      - name: Merge upstream
+        run: |
+          git merge upstream/main --no-edit || true
+
+      - name: Push
+        run: |
+          git push origin main
