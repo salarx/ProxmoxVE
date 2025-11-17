@@ -60,10 +60,10 @@ function update_script() {
     cd /opt/mediamanager/web
 
     cat <<EOF > /opt/mediamanager/web/.env
-    PUBLIC_VERSION=""
-    PUBLIC_API_URL=""
-    BASE_PATH="/web"
-    EOF
+PUBLIC_VERSION=""
+PUBLIC_API_URL=""
+BASE_PATH="/web"
+EOF
 
     chown $MM_USER:$MM_GROUP /opt/mediamanager/web/.env
 
