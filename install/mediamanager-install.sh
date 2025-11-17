@@ -55,6 +55,15 @@ mkdir -p "$MM_DIR"
 chown -R $MM_USER:$MM_GROUP /opt/mediamanager
 chown -R $MM_USER:$MM_GROUP "$MM_DIR"
 cd /opt/mediamanager/web
+
+cat <<EOF > /opt/mediamanager/web/.env
+PUBLIC_VERSION=""
+PUBLIC_API_URL=""
+BASE_PATH="/web"
+EOF
+
+chown $MM_USER:$MM_GROUP /opt/mediamanager/web/.env
+
 sudo -u $MM_USER npm ci --no-fund --no-audit
 sudo -u $MM_USER npm run build
 mkdir -p {"$MM_DIR"/web,"$MEDIA_DIR","$CONFIG_DIR"}

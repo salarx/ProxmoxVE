@@ -59,6 +59,14 @@ function update_script() {
 
     cd /opt/mediamanager/web
 
+    cat <<EOF > /opt/mediamanager/web/.env
+    PUBLIC_VERSION=""
+    PUBLIC_API_URL=""
+    BASE_PATH="/web"
+    EOF
+
+    chown $MM_USER:$MM_GROUP /opt/mediamanager/web/.env
+
     # Run frontend build as media user
     sudo -u $MM_USER npm ci --no-fund --no-audit
     sudo -u $MM_USER npm run build
