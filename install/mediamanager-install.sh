@@ -62,7 +62,6 @@ cp -r build "$FRONTEND_FILES_DIR"
 export BASE_PATH=""
 export VIRTUAL_ENV="${MM_DIR}/venv"
 cd /opt/mediamanager
-chown -R $MM_USER:$MM_GROUP /opt/mediamanager
 cp -r {media_manager,alembic*} "$MM_DIR"
 sudo -u $MM_USER /usr/local/bin/uv sync --locked --active -n -p cpython3.13 --managed-python
 msg_ok "Configured MediaManager"

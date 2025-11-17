@@ -1349,7 +1349,8 @@ EOF'
       groupadd ${MM_GROUP:-media}
     fi
     if ! id ${MM_USER:-media} >/dev/null 2>&1; then
-      useradd -r -s /usr/sbin/nologin -g ${MM_GROUP:-media} ${MM_USER:-media}
+      useradd -m -d /home/${MM_USER:-media} -s /usr/sbin/nologin -g ${MM_GROUP:-media} ${MM_USER:-media}
+      chown -R ${MM_USER:-media}:${MM_GROUP:-media} /home/${MM_USER:-media}
     fi
   "
 
